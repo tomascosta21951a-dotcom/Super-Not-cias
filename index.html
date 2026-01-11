@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Notícias</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function SuperNoticias() {
+            const [user, setUser] = useState(null);
+            const [noticias, setNoticias] = useState([]);
+            const [noticiaAtual, setNoticiaAtual] = useState(null);
+            const [pesquisa, setPesquisa] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            const [showRegistro, setShowRegistro] = useState(false);
+            const [showCriar, setShowCriar] = useState(false);
+            const [showPermissoes, setShowPermissoes] = useState(false);
+            const [usuarios, setUsuarios] = useState([]);
+            const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+            const [registroForm, setRegistroForm] = useState({ username: '', password: '', confirmPassword: '' });
+            const [novaNoticia, setNovaNoticia] = useState({
+                titulo: '',
+                conteudo: '',
+                tipo: 'texto',
+                midia: ''
+            });
+            const [novoUsuario, setNovoUsuario] = useState({ username: '', password: '' });
+
+            useEffect(() => {
+                carregarDados();
+            }, []);
+
+            const carregarDados = async () => {
+                try {
+                    const noticiasResult = await window.storage.get('noticias', true);
+                    if (noticiasResult) {
+                        setNoticias(JSON.parse(noticiasResult.value));
+                    }
+                } catch (error) {
+                    console.log('Nenhuma notícia ainda');
+                }
+
+                try {
+                    const usuariosResult = await window.storage.get('usuarios', true);
+                    if (usuariosResult) {
+                        setUsuarios(JSON.parse(usuariosResult.value));
+                    }
+                } catch (error) {
+                    const usuariosPadrao = [{ username: 'Tomás', password: 'Claude.ia', admin: true }];
+                    await window.storage.set('usuarios', JSON.stringify(usuariosPadrao), true);
+                    setUsuarios(usuariosPadrao);
+                }
+            };
+
+            const handleLogin = async () => {
+                const usuarioEncontrado = usuarios.find(
+                    u => u.username === loginForm.username && u.password === loginForm.password
+                );
+                
+                if (usuarioEncontrado) {
+                    setUser(usuarioEncontrado);
+                    setShowLogin(false);
+                    setLoginForm({ username: '', password: '' });
+                } else {
+                    alert('Usuário ou senha incorretos!');
+                }
+            };
+
+            const handleRegistro = async () => {
+                if (!registroForm.username || !registroForm.password || !registroForm.confirmPassword) {
+                    alert('Preencha todos os campos!');
+                    return;
+                }
+
+                if (registroForm.password !== registroForm.confirmPassword) {
+                    alert('As senhas não coincidem!');
+                    return;
+                }
+
+                const usuarioExiste = usuarios.find(u => u.username === registroForm.username);
+                if (usuarioExiste) {
+                    alert('Usuário já existe!');
+                    return;
+                }
+
+                const novoUsr = {
+                    username: registroForm.username,
+                    password: registroForm.password,
+                    admin: false
+                };
+
+                const usuariosAtualizados = [...usuarios, novoUsr];
+                setUsuarios(usuariosAtualizados);
+                await window.storage.set('usuarios', JSON.stringify(usuariosAtualizados), true);
+                
+                setUser(novoUsr);
+                setShowRegistro(false);
+                setRegistroForm({ username: '', password: '', confirmPassword: '' });
+                alert('Conta criada com sucesso!');
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+                setNoticiaAtual(null);
+            };
+
+            const handleCriarNoticia = async () => {
+                if (!novaNoticia.titulo || !novaNoticia.conteudo) {
+                    alert('Preencha todos os campos!');
+                    return;
+                }
+
+                const noticia = {
+                    id: Date.now(),
+                    ...novaNoticia,
+                    autor: user.username,
+                    data: new Date().toLocaleDateString('pt-PT')
+                };
+
+                const noticiasAtualizadas = [noticia, ...noticias];
+                setNoticias(noticiasAtualizadas);
+                
+                await window.storage.set('noticias', JSON.stringify(noticiasAtualizadas), true);
+                
+                setShowCriar(false);
+                setNovaNoticia({ titulo: '', conteudo: '', tipo: 'texto', midia: '' });
+            };
+
+            const handleAdicionarUsuario = async () => {
+                if (!novoUsuario.username || !novoUsuario.password) {
+                    alert('Preencha todos os campos!');
+                    return;
+                }
+
+                const usuarioExiste = usuarios.find(u => u.username === novoUsuario.username);
+                if (usuarioExiste) {
+                    alert('Usuário já existe!');
+                    return;
+                }
+
+                const usuariosAtualizados = [...usuarios, { ...novoUsuario, admin: false }];
+                setUsuarios(usuariosAtualizados);
+                await window.storage.set('usuarios', JSON.stringify(usuariosAtualizados), true);
+                setNovoUsuario({ username: '', password: '' });
+                alert('Usuário adicionado com sucesso!');
+            };
+
+            const handleRemoverUsuario = async (username) => {
+                if (username === 'Tomás') {
+                    alert('Não é possível remover o Tomás!');
+                    return;
+                }
+
+                const usuariosAtualizados = usuarios.filter(u => u.username !== username);
+                setUsuarios(usuariosAtualizados);
+                await window.storage.set('usuarios', JSON.stringify(usuariosAtualizados), true);
+            };
+
+            const noticiasFiltradas = noticias.filter(n =>
+                n.titulo.toLowerCase().includes(pesquisa.toLowerCase())
+            );
+
+            if (noticiaAtual) {
+                const outrasNoticias = noticias.filter(n => n.id !== noticiaAtual.id).slice(0, 5);
+
+                return (
+                    <div className="min-h-screen bg-gray-100">
+                        <header className="bg-blue-600 text-white p-4 shadow-lg">
+                            <div className="max-w-7xl mx-auto flex justify-between items-center">
+                                <h1 
+                                    className="text-3xl font-bold cursor-pointer"
+                                    onClick={() => setNoticiaAtual(null)}
+                                >
+                                    Super Notícias
+                                </h1>
+                                {user && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">Olá, {user.username}!</span>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="bg-red-500 hover:bg-red-600 px-3 py-1 rounded"
+                                        >
+                                            Sair
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </header>
+
+                        <div className="max-w-7xl mx-auto p-6 flex gap-6 flex-wrap">
+                            <div className="flex-1 bg-white rounded-lg shadow-lg p-6 min-w-0">
+                                <button
+                                    onClick={() => setNoticiaAtual(null)}
+                                    className="text-blue-600 hover:underline mb-4"
+                                >
+                                    ← Voltar
+                                </button>
+                                
+                                <h1 className="text-4xl font-bold mb-4">{noticiaAtual.titulo}</h1>
+                                
+                                <div className="text-gray-600 text-sm mb-4">
+                                    Por {noticiaAtual.autor} • {noticiaAtual.data}
+                                </div>
+
+                                {noticiaAtual.tipo === 'imagem' && noticiaAtual.midia && (
+                                    <img
+                                        src={noticiaAtual.midia}
+                                        alt={noticiaAtual.titulo}
+                                        className="w-full max-h-96 object-cover rounded mb-4"
+                                    />
+                                )}
+
+                                {noticiaAtual.tipo === 'video' && noticiaAtual.midia && (
+                                    <video
+                                        src={noticiaAtual.midia}
+                                        controls
+                                        className="w-full max-h-96 rounded mb-4"
+                                    />
+                                )}
+
+                                <div className="text-lg leading-relaxed whitespace-pre-wrap">
+                                    {noticiaAtual.conteudo}
+                                </div>
+                            </div>
+
+                            <div className="w-80">
+                                <h3 className="text-xl font-bold mb-4">Outras Notícias</h3>
+                                <div className="space-y-4">
+                                    {outrasNoticias.map(noticia => (
+                                        <div
+                                            key={noticia.id}
+                                            className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-lg transition"
+                                            onClick={() => setNoticiaAtual(noticia)}
+                                        >
+                                            <h4 className="font-bold text-sm mb-2">{noticia.titulo}</h4>
+                                            <p className="text-xs text-gray-600">
+                                                {noticia.conteudo.substring(0, 80)}...
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <header className="bg-blue-600 text-white p-4 shadow-lg">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="flex justify-between items-center mb-4">
+                                <h1 className="text-4xl font-bold">Super Notícias</h1>
+                                <div className="flex gap-2 flex-wrap">
+                                    {!user ? (
+                                        <>
+                                            <button
+                                                onClick={() => setShowLogin(true)}
+                                                className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50"
+                                            >
+                                                Login
+                                            </button>
+                                            <button
+                                                onClick={() => setShowRegistro(true)}
+                                                className="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600"
+                                            >
+                                                Inscrever-se
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => setShowCriar(true)}
+                                                className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-semibold"
+                                            >
+                                                Criar Notícia
+                                            </button>
+                                            {user.admin && (
+                                                <button
+                                                    onClick={() => setShowPermissoes(true)}
+                                                    className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg font-semibold"
+                                                >
+                                                    Permissões
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={handleLogout}
+                                                className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-semibold"
+                                            >
+                                                Sair
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Pesquisar notícias..."
+                                    value={pesquisa}
+                                    onChange={(e) => setPesquisa(e.target.value)}
+                                    className="w-full px-4 py-3 pl-12 rounded-lg text-gray-800 text-lg"
+                                />
+                                <svg className="absolute left-4 top-3.5 text-gray-400 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-6xl mx-auto p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {noticiasFiltradas.map(noticia => (
+                                <div
+                                    key={noticia.id}
+                                    className="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition transform hover:scale-105"
+                                    onClick={() => setNoticiaAtual(noticia)}
+                                >
+                                    {noticia.tipo === 'imagem' && noticia.midia && (
+                                        <img
+                                            src={noticia.midia}
+                                            alt={noticia.titulo}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                    )}
+                                    {noticia.tipo === 'video' && noticia.midia && (
+                                        <video
+                                            src={noticia.midia}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                    )}
+                                    <div className="p-4">
+                                        <h3 className="text-xl font-bold mb-2">{noticia.titulo}</h3>
+                                        <p className="text-gray-600 text-sm mb-2">
+                                            {noticia.conteudo.substring(0, 100)}...
+                                        </p>
+                                        <div className="text-xs text-gray-500">
+                                            Por {noticia.autor} • {noticia.data}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {noticiasFiltradas.length === 0 && (
+                            <div className="text-center text-gray-500 mt-12">
+                                <p className="text-xl">Nenhuma notícia encontrada</p>
+                            </div>
+                        )}
+                    </main>
+
+                    {showLogin && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                                <h2 className="text-2xl font-bold mb-4">Login</h2>
+                                <input
+                                    type="text"
+                                    placeholder="Usuário"
+                                    value={loginForm.username}
+                                    onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-3"
+                                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Senha"
+                                    value={loginForm.password}
+                                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-4"
+                                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleLogin}
+                                        className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                                    >
+                                        Entrar
+                                    </button>
+                                    <button
+                                        onClick={() => setShowLogin(false)}
+                                        className="flex-1 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showRegistro && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                                <h2 className="text-2xl font-bold mb-4">Criar Conta</h2>
+                                <input
+                                    type="text"
+                                    placeholder="Nome de usuário"
+                                    value={registroForm.username}
+                                    onChange={(e) => setRegistroForm({ ...registroForm, username: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-3"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Senha"
+                                    value={registroForm.password}
+                                    onChange={(e) => setRegistroForm({ ...registroForm, password: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-3"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Confirmar senha"
+                                    value={registroForm.confirmPassword}
+                                    onChange={(e) => setRegistroForm({ ...registroForm, confirmPassword: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-4"
+                                    onKeyPress={(e) => e.key === 'Enter' && handleRegistro()}
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleRegistro}
+                                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                                    >
+                                        Criar Conta
+                                    </button>
+                                    <button
+                                        onClick={() => setShowRegistro(false)}
+                                        className="flex-1 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showCriar && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-2xl my-8">
+                                <h2 className="text-2xl font-bold mb-4">Criar Nova Notícia</h2>
+                                
+                                <input
+                                    type="text"
+                                    placeholder="Título"
+                                    value={novaNoticia.titulo}
+                                    onChange={(e) => setNovaNoticia({ ...novaNoticia, titulo: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-3"
+                                />
+
+                                <select
+                                    value={novaNoticia.tipo}
+                                    onChange={(e) => setNovaNoticia({ ...novaNoticia, tipo: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-3"
+                                >
+                                    <option value="texto">Somente Texto</option>
+                                    <option value="imagem">Imagem + Texto</option>
+                                    <option value="video">Vídeo + Texto</option>
+                                </select>
+
+                                {novaNoticia.tipo !== 'texto' && (
+                                    <input
+                                        type="text"
+                                        placeholder="URL da imagem ou vídeo (.png, .webp, .mp4, etc.)"
+                                        value={novaNoticia.midia}
+                                        onChange={(e) => setNovaNoticia({ ...novaNoticia, midia: e.target.value })}
+                                        className="w-full px-4 py-2 border rounded mb-3"
+                                    />
+                                )}
+
+                                <textarea
+                                    placeholder="Conteúdo da notícia"
+                                    value={novaNoticia.conteudo}
+                                    onChange={(e) => setNovaNoticia({ ...novaNoticia, conteudo: e.target.value })}
+                                    className="w-full px-4 py-2 border rounded mb-4 h-40"
+                                />
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleCriarNoticia}
+                                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                                    >
+                                        Publicar
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCriar(false)}
+                                        className="flex-1 bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showPermissoes && user && user.admin && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-2xl my-8">
+                                <h2 className="text-2xl font-bold mb-4">Gerenciar Usuários</h2>
+                                
+                                <div className="mb-6">
+                                    <h3 className="font-bold mb-2">Adicionar Novo Usuário</h3>
+                                    <div className="flex gap-2 mb-4 flex-wrap">
+                                        <input
+                                            type="text"
+                                            placeholder="Usuário"
+                                            value={novoUsuario.username}
+                                            onChange={(e) => setNovoUsuario({ ...novoUsuario, username: e.target.value })}
+                                            className="flex-1 px-4 py-2 border rounded min-w-0"
+                                        />
+                                        <input
+                                            type="password"
+                                            placeholder="Senha"
+                                            value={novoUsuario.password}
+                                            onChange={(e) => setNovoUsuario({ ...novoUsuario, password: e.target.value })}
+                                            className="flex-1 px-4 py-2 border rounded min-w-0"
+                                        />
+                                        <button
+                                            onClick={handleAdicionarUsuario}
+                                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                                        >
+                                            Adicionar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="font-bold mb-2">Usuários Cadastrados</h3>
+                                    <div className="space-y-2">
+                                        {usuarios.map(usuario => (
+                                            <div
+                                                key={usuario.username}
+                                                className="flex justify-between items-center p-3 bg-gray-50 rounded"
+                                            >
+                                                <div>
+                                                    <span className="font-semibold">{usuario.username}</span>
+                                                    {usuario.admin && (
+                                                        <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-1 rounded">
+                                                            Admin
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {usuario.username !== 'Tomás' && (
+                                                    <button
+                                                        onClick={() => handleRemoverUsuario(usuario.username)}
+                                                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                                                    >
+                                                        Remover
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setShowPermissoes(false)}
+                                    className="w-full bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 mt-4"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<SuperNoticias />, document.getElementById('root'));
+    </script>
+</body>
+</html>
